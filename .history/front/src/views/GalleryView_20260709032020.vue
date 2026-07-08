@@ -1,66 +1,42 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useCreativeStore, type Creative } from "@/stores/creative";
+import { ref, computed } from 'vue'
+import { useCreativeStore, type Creative } from '@/stores/creative'
 
-const store = useCreativeStore();
-const searchQuery = ref("");
+const store = useCreativeStore()
+const searchQuery = ref('')
 
 // 示例广告数据 - 使用网络图片
 const bannerAds = [
-  {
-    id: 1,
-    title: "限时特惠",
-    subtitle: "AI生成图片8折",
-    image: "https://picsum.photos/seed/banner1/400/300",
-    color: "#667eea",
-  },
-  {
-    id: 2,
-    title: "新品上线",
-    subtitle: "视频生成功能",
-    image: "https://picsum.photos/seed/banner2/400/300",
-    color: "#764ba2",
-  },
-  {
-    id: 3,
-    title: "创作者计划",
-    subtitle: "投稿赢大奖",
-    image: "https://picsum.photos/seed/banner3/400/300",
-    color: "#f093fb",
-  },
-  {
-    id: 4,
-    title: "教程中心",
-    subtitle: "快速上手指南",
-    image: "https://picsum.photos/seed/banner4/400/300",
-    color: "#4ecdc4",
-  },
-];
+  { id: 1, title: '限时特惠', subtitle: 'AI生成图片8折', image: 'https://picsum.photos/seed/banner1/400/300', color: '#667eea' },
+  { id: 2, title: '新品上线', subtitle: '视频生成功能', image: 'https://picsum.photos/seed/banner2/400/300', color: '#764ba2' },
+  { id: 3, title: '创作者计划', subtitle: '投稿赢大奖', image: 'https://picsum.photos/seed/banner3/400/300', color: '#f093fb' },
+  { id: 4, title: '教程中心', subtitle: '快速上手指南', image: 'https://picsum.photos/seed/banner4/400/300', color: '#4ecdc4' },
+]
 
 const filteredCreatives = computed(() => {
-  if (!searchQuery.value) return store.creatives;
+  if (!searchQuery.value) return store.creatives
   return store.creatives.filter((c: Creative) =>
-    c.title.toLowerCase().includes(searchQuery.value.toLowerCase()),
-  );
-});
+    c.title.toLowerCase().includes(searchQuery.value.toLowerCase())
+  )
+})
 
 // 生成瀑布流布局
 const masonryItems = computed(() => {
   return filteredCreatives.value.map((item: Creative, index: number) => {
-    const seed = parseInt(item.id) || index;
-    const offsetX = ((seed * 37) % 20) - 10;
-    const offsetY = ((seed * 53) % 80) - 40;
-    const scale = 0.95 + ((seed * 23) % 15) / 100;
-    const rotation = ((seed * 17) % 6) - 3;
-
-    return { ...item, index, offsetX, offsetY, scale, rotation };
-  });
-});
+    const seed = parseInt(item.id) || index
+    const offsetX = ((seed * 37) % 20) - 10
+    const offsetY = ((seed * 53) % 80) - 40
+    const scale = 0.95 + ((seed * 23) % 15) / 100
+    const rotation = ((seed * 17) % 6) - 3
+    
+    return { ...item, index, offsetX, offsetY, scale, rotation }
+  })
+})
 
 const getImage = (id: string, index: number) => {
-  const seed = parseInt(id) || index + 10;
-  return `https://picsum.photos/seed/${seed}/600/400`;
-};
+  const seed = parseInt(id) || index + 10
+  return `https://picsum.photos/seed/${seed}/600/400`
+}
 </script>
 
 <template>
@@ -76,7 +52,7 @@ const getImage = (id: string, index: number) => {
             :style="{
               '--rotation': `${(index - (bannerAds.length - 1) / 2) * 35}deg`,
               '--delay': `${index * 0.12}s`,
-              '--color': banner.color,
+              '--color': banner.color
             }"
           >
             <img :src="banner.image" :alt="banner.title" class="banner-image" />
@@ -92,26 +68,9 @@ const getImage = (id: string, index: number) => {
     <!-- 搜索区域 -->
     <section class="search-section">
       <div class="search-wrapper">
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 20 20"
-          fill="none"
-          class="search-icon"
-        >
-          <circle
-            cx="9"
-            cy="9"
-            r="6"
-            stroke="currentColor"
-            stroke-width="1.5"
-          />
-          <path
-            d="M14 14L18 18"
-            stroke="currentColor"
-            stroke-width="1.5"
-            stroke-linecap="round"
-          />
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" class="search-icon">
+          <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M14 14L18 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
         <input
           v-model="searchQuery"
@@ -119,9 +78,7 @@ const getImage = (id: string, index: number) => {
           placeholder="搜索你喜欢的作品..."
           class="search-input"
         />
-        <span v-if="searchQuery" class="result-count"
-          >{{ filteredCreatives.length }} 个结果</span
-        >
+        <span v-if="searchQuery" class="result-count">{{ filteredCreatives.length }} 个结果</span>
       </div>
     </section>
 
@@ -137,51 +94,28 @@ const getImage = (id: string, index: number) => {
             '--offset-y': `${item.offsetY}px`,
             '--scale': item.scale,
             '--rotation': `${item.rotation}deg`,
-            '--stagger': `${index * 0.08}s`,
+            '--stagger': `${index * 0.08}s`
           }"
         >
           <div class="masonry-card card card-hover">
             <div class="card-image">
-              <img
-                :src="getImage(item.id, index)"
-                :alt="item.title"
-                loading="lazy"
-              />
+              <img :src="getImage(item.id, index)" :alt="item.title" loading="lazy" />
               <div class="card-overlay">
                 <button class="overlay-btn" title="预览">
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path
-                      d="M10 4C6 4 2.5 8 2.5 12C2.5 16 6 20 10 20C14 20 17.5 16 17.5 12C17.5 8 14 4 10 4Z"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                    />
-                    <circle
-                      cx="10"
-                      cy="11"
-                      r="3"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                    />
+                    <path d="M10 4C6 4 2.5 8 2.5 12C2.5 16 6 20 10 20C14 20 17.5 16 17.5 12C17.5 8 14 4 10 4Z" stroke="currentColor" stroke-width="1.5"/>
+                    <circle cx="10" cy="11" r="3" stroke="currentColor" stroke-width="1.5"/>
                   </svg>
                 </button>
                 <button class="overlay-btn" title="收藏">
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                    <path
-                      d="M10 17L4.5 12C2.5 10 2.5 7 4.5 5C6.5 3 9.5 3 10 5C10.5 3 13.5 3 15.5 5C17.5 7 17.5 10 15.5 12L10 17Z"
-                      stroke="currentColor"
-                      stroke-width="1.5"
-                    />
+                    <path d="M10 17L4.5 12C2.5 10 2.5 7 4.5 5C6.5 3 9.5 3 10 5C10.5 3 13.5 3 15.5 5C17.5 7 17.5 10 15.5 12L10 17Z" stroke="currentColor" stroke-width="1.5"/>
                   </svg>
                 </button>
               </div>
               <div class="card-type" v-if="item.type === 'video'">
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 12 12"
-                  fill="currentColor"
-                >
-                  <path d="M3 2L10 6L3 10V2Z" />
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                  <path d="M3 2L10 6L3 10V2Z"/>
                 </svg>
               </div>
             </div>
@@ -217,7 +151,7 @@ const getImage = (id: string, index: number) => {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 24px 0 12px;
+  padding: 12px 0 20px;
   overflow: visible;
 }
 
@@ -274,12 +208,7 @@ const getImage = (id: string, index: number) => {
   left: 0;
   right: 0;
   padding: 24px 16px 20px;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.85) 0%,
-    rgba(0, 0, 0, 0.4) 60%,
-    transparent 100%
-  );
+  background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 60%, transparent 100%);
   color: #fff;
 }
 
@@ -287,7 +216,7 @@ const getImage = (id: string, index: number) => {
   font-size: 20px;
   font-weight: 600;
   margin-bottom: 6px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .banner-overlay p {
@@ -297,8 +226,8 @@ const getImage = (id: string, index: number) => {
 
 /* 搜索区域 */
 .search-section {
-  margin-top: 72px;
-  margin-bottom: 12px;
+  margin-top: 0;
+  margin-bottom: 48px;
   position: relative;
   z-index: 10;
 }
@@ -372,8 +301,7 @@ const getImage = (id: string, index: number) => {
 @keyframes fade-in {
   from {
     opacity: 0;
-    transform: translate(var(--offset-x), calc(var(--offset-y) + 50px))
-      scale(0.8);
+    transform: translate(var(--offset-x), calc(var(--offset-y) + 50px)) scale(0.8);
   }
   to {
     opacity: 1;
@@ -407,7 +335,7 @@ const getImage = (id: string, index: number) => {
 .card-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, transparent 50%);
+  background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 50%);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -506,21 +434,21 @@ const getImage = (id: string, index: number) => {
   .gallery-view {
     padding: 12px 16px;
   }
-
+  
   .banner-fan {
     width: 100%;
     transform: scale(0.8);
   }
-
+  
   .masonry-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
   }
-
+  
   .masonry-item {
     transform: translate(0, 0) scale(1);
   }
-
+  
   .search-wrapper {
     padding: 12px 16px;
   }
