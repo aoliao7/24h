@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, markRaw, type Component } from 'vue'
+import { ref, computed, markRaw, type Component, onMounted } from 'vue'
 import { VueFlow, useVueFlow, MarkerType } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -272,6 +272,109 @@ const deleteDraft = (draftId: string) => {
   }
   ElMessage.info('草稿已删除')
 }
+
+// ============================================================
+// 模板加载
+// ============================================================
+interface TemplateNode {
+  id: string
+  nodeDefId: string
+  position: { x: number; y: number }
+}
+
+interface TemplateEdge {
+  id: string
+  source: string
+  target: string
+  sourcePort: string
+  targetPort: string
+  type: string
+}
+
+interface TemplateData {
+  id: string
+  name: string
+  category: 'video' | 'image'
+  nodes: TemplateNode[]
+  edges: TemplateEdge[]
+  prompt: string
+}
+
+const loadTemplateFromStorage = () => {
+  const templateJson = sessionStorage.getItem('template')
+  if (!templateJson) return
+
+  try {
+    const template: TemplateData = JSON.parse(templateJson)
+
+    // 获取默认节点数据
+    const getDefaultNodeData = (defId: string): NodeData => {
+      const base: NodeData = { status: 'idle', outputData: null }
+      if (defId === 'product-image') base.imageUrl = ''
+      if (defId === 'product-text') base.textContent = template.prompt || ''
+      if (defId === 'style-filter') base.filterPreset = '自然'
+      if (defId === 'text-add') { base.textContentNode = ''; base.textPosition = 'center' }
+      if (defId === 'smart-crop') base.cropAspect = '1:1'
+      if (defId === 'ai-image-gen') { base.aiImageModel = '标准'; base.aiImageSize = '1024×1024' }
+      if (defId === 'ai-video-gen') { base.aiVideoDuration = '4秒'; base.aiVideoMotion = '自动' }
+      return base
+    }
+
+    // 转换节点
+    const loadedNodes: VueFlowNode[] = template.nodes.map((n) => {
+      const def = nodeDefinitions.find(d => d.id === n.nodeDefId)
+      return {
+        id: n.id,
+        type: 'custom',
+        label: def?.name || n.nodeDefId,
+        nodeDefId: n.nodeDefId,
+        position: n.position,
+        data: getDefaultNodeData(n.nodeDefId),
+      }
+    })
+
+    // 使用模板中预定义的连线
+    const loadedEdges: VueFlowEdge[] = (template.edges || []).map((e: any) => {
+      const color = DATA_TYPE_COLORS[e.type as DataType] || '#9ca3af'
+      return {
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourcePort,
+        targetHandle: e.targetPort,
+        animated: true,
+        style: { stroke: color, strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color },
+        data: { dataType: e.type },
+      }
+    })
+
+    // 更新草稿
+    const draft = drafts.value.find(d => d.id === currentDraftId.value)
+    if (draft) {
+      draft.name = template.name
+      draft.nodes = loadedNodes
+      draft.edges = loadedEdges
+      draft.updatedAt = new Date().toLocaleDateString('zh-CN')
+    }
+
+    nodes.value = loadedNodes
+    edges.value = loadedEdges
+
+    // 清除 sessionStorage
+    sessionStorage.removeItem('template')
+
+    ElMessage.success(`已加载模板「${template.name}」`)
+  } catch (e) {
+    console.error('加载模板失败:', e)
+    ElMessage.error('模板加载失败')
+  }
+}
+
+// 页面加载时检查 sessionStorage
+onMounted(() => {
+  loadTemplateFromStorage()
+})
 
 // ============================================================
 // 工作流执行模拟
