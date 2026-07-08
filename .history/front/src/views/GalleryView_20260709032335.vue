@@ -217,7 +217,7 @@ const getImage = (id: string, index: number) => {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 24px 0 12px;
+  padding: 48px 0 20px;
   overflow: visible;
 }
 
@@ -297,7 +297,7 @@ const getImage = (id: string, index: number) => {
 
 /* 搜索区域 */
 .search-section {
-  margin-top: 72px;
+  margin-top: 120px;
   margin-bottom: 12px;
   position: relative;
   z-index: 10;

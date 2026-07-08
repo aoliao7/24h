@@ -210,14 +210,15 @@ const getImage = (id: string, index: number) => {
 
 /* 扇形广告区域 */
 .banner-section {
-  margin-bottom: 0;
+  margin-bottom: 72px;
+  margin-top: 72px;
 }
 
 .banner-container {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 24px 0 12px;
+  padding: 16px 0 0px;
   overflow: visible;
 }
 
