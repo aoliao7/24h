@@ -166,9 +166,6 @@ interface NodeData {
   aiImageSize?: string
   aiVideoDuration?: string
   aiVideoMotion?: string
-  // 生成后的内容
-  generatedImageUrl?: string
-  generatedVideoUrl?: string
 }
 
 interface VueFlowNode {
@@ -207,8 +204,17 @@ interface Draft {
 const drafts = ref<Draft[]>([
   {
     id: 'default',
-    name: '工作流 1',
-    nodes: [],
+    name: '默认工作流',
+    nodes: [
+      {
+        id: 'n1',
+        type: 'custom',
+        label: '产品图片',
+        nodeDefId: 'product-image',
+        position: { x: 60, y: 200 },
+        data: { status: 'idle', outputData: null },
+      },
+    ],
     edges: [],
     createdAt: new Date().toLocaleDateString('zh-CN'),
     updatedAt: new Date().toLocaleDateString('zh-CN'),
@@ -335,34 +341,11 @@ const runWorkflow = async () => {
     const node = nodes.value.find(n => n.id === nodeId)!
     const def = nodeDefinitions.find(d => d.id === node.nodeDefId)!
     const outputType = getNodeOutputType(node.nodeDefId)
-    
-    // 模拟处理时间
     await new Promise(resolve => setTimeout(resolve, 700 + Math.random() * 500))
-    
-    // 更新节点数据
-    const updateData: any = { status: 'done', outputData: { type: outputType, label: def.name } }
-    
-    // 导出节点生成模拟内容
-    if (def.id === 'export-image') {
-      // 查找上游图片
-      const upstreamImage = findUpstreamData(nodeId, 'image')
-      if (upstreamImage) {
-        updateData.generatedImageUrl = upstreamImage
-      }
-    } else if (def.id === 'export-video') {
-      // 查找上游视频或图片
-      const upstreamVideo = findUpstreamData(nodeId, 'video')
-      const upstreamImage = findUpstreamData(nodeId, 'image')
-      if (upstreamVideo) {
-        updateData.generatedVideoUrl = upstreamVideo
-      } else if (upstreamImage) {
-        // 模拟视频：使用图片作为封面
-        updateData.generatedVideoUrl = upstreamImage
-      }
-    }
-    
     nodes.value = nodes.value.map(n =>
-      n.id === nodeId ? { ...n, data: { ...n.data, ...updateData } } : n
+      n.id === nodeId
+        ? { ...n, data: { ...n.data, status: 'done', outputData: { type: outputType, label: def.name } } }
+        : n
     )
     runProgress.value = Math.round(((i + 1) / total) * 100)
   }
@@ -370,17 +353,6 @@ const runWorkflow = async () => {
   runStatus.value = 'done'
   saveDraft()
   ElMessage.success('工作流执行完成！')
-}
-
-// 查找上游数据
-const findUpstreamData = (nodeId: string, dataType: 'image' | 'video'): string | null => {
-  const edge = edges.value.find(e => e.target === nodeId)
-  if (!edge) return null
-  const sourceNode = nodes.value.find(n => n.id === edge.source)
-  if (!sourceNode) return null
-  if (sourceNode.data.imageUrl) return sourceNode.data.imageUrl
-  if (sourceNode.data.generatedImageUrl) return sourceNode.data.generatedImageUrl
-  return findUpstreamData(edge.source, dataType)
 }
 
 const resetWorkflow = () => {
@@ -394,58 +366,35 @@ const resetWorkflow = () => {
 }
 
 // ============================================================
-// 连接验证：通过 isValidConnection 阻止非法连接
+// 连接验证：isValidConnection（阻止非法连接）+ onConnect（添加后提示）
 // ============================================================
-const { onConnect, addEdges: vueFlowAddEdges } = useVueFlow()
+const { onConnect, isValidConnection } = useVueFlow()
 
-// 全局连接验证函数
-const isValidConnectionFn = (connection: any) => {
-  const sourceNode = nodes.value.find(n => n.id === connection.source)
-  const targetNode = nodes.value.find(n => n.id === connection.target)
+// 关键：用 isValidConnection 阻止非法连接
+isValidConnection((params: any) => {
+  const sourceNode = nodes.value.find(n => n.id === params.source)
+  const targetNode = nodes.value.find(n => n.id === params.target)
   if (!sourceNode || !targetNode) return false
 
   const sourceDef = nodeDefinitions.find(d => d.id === sourceNode.nodeDefId)
   const targetDef = nodeDefinitions.find(d => d.id === targetNode.nodeDefId)
   if (!sourceDef || !targetDef) return false
 
-  const sourcePort = sourceDef.outputs.find(p => p.id === connection.sourceHandle)
-  const targetPort = targetDef.inputs.find(p => p.id === connection.targetHandle)
+  const sourcePort = sourceDef.outputs.find(p => p.id === params.sourceHandleId)
+  const targetPort = targetDef.inputs.find(p => p.id === params.targetHandleId)
 
   if (!sourcePort || !targetPort) return false
-  return sourcePort.type === targetPort.type
-}
-
-// 验证连接是否有效（用于提示）
-const validateConnection = (params: any): { valid: boolean; message?: string } => {
-  const sourceNode = nodes.value.find(n => n.id === params.source)
-  const targetNode = nodes.value.find(n => n.id === params.target)
-  if (!sourceNode || !targetNode) return { valid: false }
-
-  const sourceDef = nodeDefinitions.find(d => d.id === sourceNode.nodeDefId)
-  const targetDef = nodeDefinitions.find(d => d.id === targetNode.nodeDefId)
-  if (!sourceDef || !targetDef) return { valid: false }
-
-  const sourcePort = sourceDef.outputs.find(p => p.id === params.sourceHandle)
-  const targetPort = targetDef.inputs.find(p => p.id === params.targetHandle)
-
-  if (!sourcePort || !targetPort) return { valid: false }
   if (sourcePort.type !== targetPort.type) {
-    return {
-      valid: false,
-      message: `数据类型不匹配：${sourceDef.name} 输出「${sourcePort.label}」无法连接到 ${targetDef.name} 的「${targetPort.label}」输入`
-    }
+    ElMessage.error({
+      message: `类型不匹配：${DATA_TYPE_LABELS[sourcePort.type]} 无法连接到 ${DATA_TYPE_LABELS[targetPort.type]}（${targetDef.name} 需要 ${DATA_TYPE_LABELS[targetPort.type]} 输入）`,
+      duration: 3500,
+    })
+    return false
   }
-  return { valid: true }
-}
+  return true
+})
 
 onConnect((params: any) => {
-  const result = validateConnection(params)
-  if (!result.valid) {
-    if (result.message) {
-      ElMessage.error(result.message)
-    }
-    return
-  }
   const sourceNode = nodes.value.find(n => n.id === params.source)
   const targetNode = nodes.value.find(n => n.id === params.target)
   if (!sourceNode || !targetNode) return
@@ -456,7 +405,7 @@ onConnect((params: any) => {
   const targetPort = targetDef.inputs.find(p => p.id === params.targetHandle)
   if (!sourcePort || !targetPort) return
   const color = DATA_TYPE_COLORS[sourcePort.type]
-  vueFlowAddEdges([{
+  edges.value = [...edges.value, {
     id: `e-${params.source}-${params.target}-${Date.now()}`,
     source: params.source,
     target: params.target,
@@ -466,7 +415,7 @@ onConnect((params: any) => {
     style: { stroke: color, strokeWidth: 2 },
     markerEnd: { type: MarkerType.ArrowClosed, color },
     data: { dataType: sourcePort.type },
-  }])
+  }]
   ElMessage.success(`已连接：${sourceDef.name} → ${targetDef.name}`)
 })
 
@@ -526,12 +475,6 @@ const onDrop = (event: DragEvent) => {
 // ============================================================
 const selectedNode = ref<VueFlowNode | null>(null)
 
-// 智能连线推荐面板
-const showConnectionPanel = ref(false)
-const connectionPanelPos = ref({ x: 0, y: 0 })
-const compatibleNodes = ref<NodeDef[]>([])
-const pendingConnection = ref<{ sourceId: string; sourceHandle: string } | null>(null)
-
 const handleNodeClick = (event: any) => {
   const fullNode = nodes.value.find(n => n.id === event.node.id)
   if (fullNode) selectedNode.value = fullNode
@@ -551,95 +494,6 @@ const deleteNode = () => {
 const onEdgeClick = (event: any) => {
   edges.value = edges.value.filter(e => e.id !== event.edge.id)
   ElMessage.info('连接已删除')
-}
-
-// 开始连线时显示兼容节点面板
-const onConnectStart = (params: any) => {
-  const nodeId = params.nodeId
-  const handleId = params.handleId
-  if (!nodeId || !handleId) return
-  const sourceNode = nodes.value.find(n => n.id === nodeId)
-  if (!sourceNode) return
-  const sourceDef = nodeDefinitions.find(d => d.id === sourceNode.nodeDefId)
-  if (!sourceDef) return
-  const sourcePort = sourceDef.outputs.find(p => p.id === handleId)
-  if (!sourcePort) return
-  
-  // 找到所有可以连接的节点
-  const compatible = nodeDefinitions.filter(def => {
-    return def.inputs.some(input => input.type === sourcePort.type)
-  })
-  
-  if (compatible.length > 0) {
-    pendingConnection.value = { sourceId: nodeId, sourceHandle: handleId }
-    compatibleNodes.value = compatible
-    
-    // 面板位置固定在源节点右侧
-    connectionPanelPos.value = {
-      x: sourceNode.position.x + 220,
-      y: sourceNode.position.y - 50
-    }
-    showConnectionPanel.value = true
-  }
-}
-
-// 添加节点并连接到源节点
-const addNodeAndConnect = (def: NodeDef) => {
-  if (!pendingConnection.value) return
-  
-  const sourceNode = nodes.value.find(n => n.id === pendingConnection.value!.sourceId)
-  if (!sourceNode) return
-  const sourceDef = nodeDefinitions.find(d => d.id === sourceNode.nodeDefId)
-  if (!sourceDef) return
-  
-  // 计算新节点位置
-  const sourcePos = sourceNode.position
-  const newX = sourcePos.x + 250
-  const newY = sourcePos.y + (Math.random() - 0.5) * 100
-  
-  // 创建新节点
-  const newNodeId = makeNodeId()
-  const newNode: VueFlowNode = {
-    id: newNodeId,
-    type: 'custom',
-    label: def.name,
-    nodeDefId: def.id,
-    position: { x: newX, y: newY },
-    data: getDefaultNodeData(def.id),
-  }
-  nodes.value = [...nodes.value, newNode]
-  
-  // 创建连接 - 直接添加到 edges.value
-  const sourcePort = sourceDef.outputs.find(p => p.id === pendingConnection.value!.sourceHandle)
-  if (sourcePort) {
-    const targetPort = def.inputs.find(p => p.type === sourcePort.type)
-    if (targetPort) {
-      const color = DATA_TYPE_COLORS[sourcePort.type]
-      const newEdge: VueFlowEdge = {
-        id: `e-${pendingConnection.value!.sourceId}-${newNodeId}-${Date.now()}`,
-        source: pendingConnection.value!.sourceId,
-        target: newNodeId,
-        sourceHandle: pendingConnection.value!.sourceHandle,
-        targetHandle: targetPort.id,
-        animated: true,
-        style: { stroke: color, strokeWidth: 2 },
-        markerEnd: { type: MarkerType.ArrowClosed, color },
-        data: { dataType: sourcePort.type },
-      }
-      edges.value = [...edges.value, newEdge]
-      ElMessage.success(`已添加并连接：${sourceDef.name} → ${def.name}`)
-    }
-  }
-  
-  // 关闭面板
-  showConnectionPanel.value = false
-  pendingConnection.value = null
-}
-
-// 关闭推荐面板
-const closeConnectionPanel = () => {
-  showConnectionPanel.value = false
-  pendingConnection.value = null
 }
 
 // ============================================================
@@ -672,34 +526,6 @@ const onImageSelected = (event: Event) => {
   updateNodeData('outputData', { type: 'image', label: '已上传图片' })
   updateNodeData('status', 'done')
   ElMessage.success('图片上传成功')
-}
-
-// 下载图片
-const downloadImage = (node: VueFlowNode) => {
-  const url = node.data.generatedImageUrl || node.data.imageUrl
-  if (!url) {
-    ElMessage.warning('暂无图片可下载')
-    return
-  }
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `生成图片_${Date.now()}.png`
-  a.click()
-  ElMessage.success('图片下载中...')
-}
-
-// 下载视频
-const downloadVideo = (node: VueFlowNode) => {
-  const url = node.data.generatedVideoUrl
-  if (!url) {
-    ElMessage.warning('暂无视频可下载')
-    return
-  }
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `生成视频_${Date.now()}.mp4`
-  a.click()
-  ElMessage.success('视频下载中...')
 }
 </script>
 <template>
@@ -810,10 +636,8 @@ const downloadVideo = (node: VueFlowNode) => {
           :nodes-draggable="true"
           :connect-on-click="false"
           :node-types="nodeTypes"
-          :is-valid-connection="isValidConnectionFn"
           @node-click="handleNodeClick"
           @edge-click="onEdgeClick"
-          @connect-start="onConnectStart"
           fit-view-on-init
           :default-edge-options="{ animated: true, style: { strokeWidth: 2 } }"
         >
@@ -827,52 +651,6 @@ const downloadVideo = (node: VueFlowNode) => {
             mask-color="rgba(247, 248, 250, 0.9)"
           />
         </VueFlow>
-        
-        <!-- 全局生成动画提示 -->
-        <Transition name="generating-fade">
-          <div v-if="runStatus === 'running'" class="generating-overlay">
-            <div class="generating-content">
-              <div class="generating-spinner">
-                <div class="spinner-ring"></div>
-                <div class="spinner-ring"></div>
-                <div class="spinner-ring"></div>
-              </div>
-              <div class="generating-text">正在生成中...</div>
-              <div class="generating-progress">{{ runProgress }}%</div>
-            </div>
-          </div>
-        </Transition>
-        
-        <!-- 智能连线推荐面板 -->
-        <Transition name="fade">
-          <div
-            v-if="showConnectionPanel"
-            class="connection-panel"
-            :style="{ left: connectionPanelPos.x + 'px', top: connectionPanelPos.y + 'px' }"
-          >
-            <div class="connection-panel__header">
-              <span class="connection-panel__title">可连接的节点</span>
-              <button class="connection-panel__close" @click="closeConnectionPanel">×</button>
-            </div>
-            <div class="connection-panel__list">
-              <div
-                v-for="def in compatibleNodes"
-                :key="def.id"
-                class="connection-panel__item"
-                @click="addNodeAndConnect(def)"
-              >
-                <div class="item-icon" :style="{ background: def.color + '20', borderColor: def.color + '40' }">
-                  <span :style="{ color: def.color }">{{ def.name[0] }}</span>
-                </div>
-                <div class="item-info">
-                  <span class="item-name">{{ def.name }}</span>
-                  <span class="item-desc">{{ def.desc }}</span>
-                </div>
-                <div class="item-arrow">+</div>
-              </div>
-            </div>
-          </div>
-        </Transition>
       </div>
 
       <!-- 底部草稿管理条 -->
@@ -1096,8 +874,8 @@ const downloadVideo = (node: VueFlowNode) => {
             </div>
           </template>
 
-          <!-- 导出图片节点 -->
-          <template v-else-if="selectedNodeDef.id === 'export-image'">
+          <!-- 导出节点 -->
+          <template v-else-if="selectedNodeDef.category === 'output'">
             <div class="property-section">
               <div class="export-hint">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -1105,57 +883,6 @@ const downloadVideo = (node: VueFlowNode) => {
                   <path d="M2 18H18" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
                 <span>点击「开始生成」后自动导出成品</span>
-              </div>
-            </div>
-            <div class="property-section">
-              <button 
-                class="download-btn" 
-                :disabled="!selectedNode.data.generatedImageUrl && !selectedNode.data.imageUrl"
-                @click="downloadImage(selectedNode!)"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 11V2M8 11L4 7M8 11L12 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  <path d="M2 14H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                下载图片
-              </button>
-            </div>
-            <div v-if="selectedNode.data.generatedImageUrl || selectedNode.data.imageUrl" class="property-section">
-              <label class="property-label">预览</label>
-              <div class="image-preview-box">
-                <img :src="selectedNode.data.generatedImageUrl || selectedNode.data.imageUrl" alt="生成图片" />
-              </div>
-            </div>
-          </template>
-
-          <!-- 导出视频节点 -->
-          <template v-else-if="selectedNodeDef.id === 'export-video'">
-            <div class="property-section">
-              <div class="export-hint">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M10 14V2M10 14L6 10M10 14L14 10" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  <path d="M2 18H18" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                <span>点击「开始生成」后自动导出成品</span>
-              </div>
-            </div>
-            <div class="property-section">
-              <button 
-                class="download-btn" 
-                :disabled="!selectedNode.data.generatedVideoUrl"
-                @click="downloadVideo(selectedNode!)"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 11V2M8 11L4 7M8 11L12 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  <path d="M2 14H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                下载视频
-              </button>
-            </div>
-            <div v-if="selectedNode.data.generatedVideoUrl" class="property-section">
-              <label class="property-label">预览</label>
-              <div class="video-preview-box">
-                <video :src="selectedNode.data.generatedVideoUrl" controls></video>
               </div>
             </div>
           </template>
@@ -1225,10 +952,7 @@ const downloadVideo = (node: VueFlowNode) => {
   display: flex;
   gap: 20px;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  border-radius: 20px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  background: var(--bg-base);
 }
 
 /* ===== 侧边栏 ===== */
@@ -1893,63 +1617,6 @@ const downloadVideo = (node: VueFlowNode) => {
   box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.1);
 }
 
-/* 下载按钮 */
-.download-btn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: linear-gradient(135deg, #4ecdc4, #44a08d);
-  border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-
-.download-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
-}
-
-.download-btn:disabled {
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-  cursor: not-allowed;
-}
-
-/* 预览区域 */
-.image-preview-box {
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--border-light);
-  background: var(--bg-elevated);
-}
-
-.image-preview-box img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.video-preview-box {
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid var(--border-light);
-  background: var(--bg-elevated);
-}
-
-.video-preview-box video {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
 /* 导出提示 */
 .export-hint {
   display: flex;
@@ -2086,200 +1753,5 @@ const downloadVideo = (node: VueFlowNode) => {
 
 :deep(.vue-flow__edge-path) {
   stroke-width: 2;
-}
-
-/* ===== 智能连线推荐面板 ===== */
-.connection-panel {
-  position: absolute;
-  z-index: 100;
-  background: var(--bg-card);
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-  min-width: 220px;
-  max-width: 280px;
-  overflow: hidden;
-}
-
-.connection-panel__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.connection-panel__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.connection-panel__close {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 0;
-}
-
-.connection-panel__close:hover {
-  color: var(--text-primary);
-}
-
-.connection-panel__list {
-  max-height: 300px;
-  overflow-y: auto;
-  padding: 6px;
-}
-
-.connection-panel__item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.connection-panel__item:hover {
-  background: rgba(78, 205, 196, 0.08);
-}
-
-.item-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.item-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.item-name {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 2px;
-}
-
-.item-desc {
-  display: block;
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.item-arrow {
-  color: var(--accent-cyan);
-  font-size: 16px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-/* 淡入淡出动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* ===== 生成动画提示 ===== */
-.generating-overlay {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 200;
-  pointer-events: none;
-}
-
-.generating-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 32px 48px;
-  background: rgba(26, 31, 54, 0.9);
-  backdrop-filter: blur(12px);
-  border-radius: 20px;
-  border: 1px solid rgba(78, 205, 196, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-}
-
-.generating-spinner {
-  position: relative;
-  width: 60px;
-  height: 60px;
-}
-
-.spinner-ring {
-  position: absolute;
-  inset: 0;
-  border: 3px solid transparent;
-  border-top-color: #4ecdc4;
-  border-radius: 50%;
-  animation: spin-ring 1.2s linear infinite;
-}
-
-.spinner-ring:nth-child(2) {
-  inset: 6px;
-  border-top-color: #a78bfa;
-  animation-delay: -0.4s;
-  animation-direction: reverse;
-}
-
-.spinner-ring:nth-child(3) {
-  inset: 12px;
-  border-top-color: #60a5fa;
-  animation-delay: -0.8s;
-}
-
-@keyframes spin-ring {
-  to { transform: rotate(360deg); }
-}
-
-.generating-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: #fff;
-  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-
-.generating-progress {
-  font-size: 28px;
-  font-weight: 700;
-  color: #4ecdc4;
-  font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-
-.generating-fade-enter-active,
-.generating-fade-leave-active {
-  transition: all 0.3s ease;
-}
-
-.generating-fade-enter-from,
-.generating-fade-leave-to {
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.9);
 }
 </style>
