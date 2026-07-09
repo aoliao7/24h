@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { calculateWorkflowCost } from '@/stores/creative'
 
 const router = useRouter()
 
@@ -24,6 +25,11 @@ const getNodeDef = (defId: string) => nodeDefinitions.find(n => n.id === defId)
 // 检查模板是否有产品描述节点
 const hasProductText = (template: any) => {
   return template.nodes.some((n: any) => n.nodeDefId === 'product-text')
+}
+
+// 计算模板消耗积分
+const getTemplateCost = (template: any) => {
+  return calculateWorkflowCost(template.nodes)
 }
 
 const useTemplate = (template: any) => {
@@ -220,6 +226,18 @@ const imageTemplates = reactive([
           <div class="card-content">
             <h3>{{ template.name }}</h3>
             <p>{{ template.desc }}</p>
+            <div class="card-meta">
+              <div class="cost-badge" v-if="getTemplateCost(template) > 0">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1"/>
+                  <path d="M5 3V5.5L6.5 6.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+                </svg>
+                {{ getTemplateCost(template) }} 积分
+              </div>
+              <div class="cost-badge free" v-else>
+                免费
+              </div>
+            </div>
             <!-- 产品描述编辑 -->
             <div v-if="hasProductText(template)" class="card-prompt">
               <div class="prompt-label">
@@ -279,6 +297,18 @@ const imageTemplates = reactive([
           <div class="card-content">
             <h3>{{ template.name }}</h3>
             <p>{{ template.desc }}</p>
+            <div class="card-meta">
+              <div class="cost-badge" v-if="getTemplateCost(template) > 0">
+                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                  <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1"/>
+                  <path d="M5 3V5.5L6.5 6.5" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+                </svg>
+                {{ getTemplateCost(template) }} 积分
+              </div>
+              <div class="cost-badge free" v-else>
+                免费
+              </div>
+            </div>
             <!-- 产品描述编辑 -->
             <div v-if="hasProductText(template)" class="card-prompt">
               <div class="prompt-label">
@@ -490,6 +520,32 @@ const imageTemplates = reactive([
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 14px;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.cost-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid rgba(78, 205, 196, 0.2);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+.cost-badge.free {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.2);
+  color: #059669;
 }
 
 /* 产品描述编辑 */

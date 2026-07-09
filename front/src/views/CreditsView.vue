@@ -1,16 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useCreativeStore } from '@/stores/creative'
 
 const store = useCreativeStore()
-
-const transactions = ref([
-  { id: 1, desc: 'AI 场景生成', amount: -50, time: '2026-07-08 14:30' },
-  { id: 2, desc: '视频生成服务', amount: -120, time: '2026-07-08 11:20' },
-  { id: 3, desc: '充值积分', amount: 500, time: '2026-07-05 09:00' },
-  { id: 4, desc: '高清图片导出', amount: -30, time: '2026-07-03 16:45' },
-  { id: 5, desc: '批量处理', amount: -80, time: '2026-07-01 10:15' },
-])
 
 const formatAmount = (amount: number) => amount > 0 ? `+${amount}` : amount.toString()
 
@@ -20,6 +12,11 @@ const packages = [
   { amount: 1000, price: 80, bonus: 100, recommended: true },
   { amount: 2000, price: 150, bonus: 300, recommended: false },
 ]
+
+const handleRecharge = (pkg: typeof packages[0]) => {
+  const actualAmount = pkg.amount + (pkg.bonus || 0)
+  store.addCredits(actualAmount)
+}
 </script>
 
 <template>
@@ -86,7 +83,7 @@ const packages = [
         </button>
       </div>
 
-      <el-table :data="transactions" stripe>
+      <el-table :data="store.transactions" stripe>
         <el-table-column prop="time" label="时间" width="180" />
         <el-table-column prop="desc" label="描述" />
         <el-table-column label="积分" width="120" align="center">
@@ -107,9 +104,13 @@ const packages = [
           <div v-if="pkg.recommended" class="recommended-badge">推荐</div>
           <div class="pkg-amount">{{ pkg.amount }}</div>
           <div class="pkg-label">积分</div>
-          <div class="pkg-price">¥ {{ pkg.price }}</div>
-          <div v-if="pkg.bonus" class="pkg-bonus">+{{ pkg.bonus }} 赠送</div>
-          <button class="pkg-btn" :class="{ primary: pkg.recommended }">{{ pkg.price }} 元</button>
+          <div class="pkg-price">¥{{ pkg.price }}</div>
+          <div class="pkg-bonus" :class="{ 'has-bonus': pkg.bonus }">
+            {{ pkg.bonus ? `+${pkg.bonus} 赠送` : '无优惠' }}
+          </div>
+          <button class="pkg-btn" :class="{ primary: pkg.recommended }" @click="handleRecharge(pkg)">
+            立即充值
+          </button>
         </div>
       </div>
     </div>
@@ -237,10 +238,14 @@ const packages = [
 }
 
 .package-card {
-  padding: 28px;
+  padding: 24px 20px;
   text-align: center;
   position: relative;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 240px;
 }
 
 .package-card.recommended {
@@ -261,22 +266,52 @@ const packages = [
   color: #fff;
 }
 
-.pkg-amount { font-size: 40px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
-.pkg-label { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
-.pkg-price { font-size: 18px; font-weight: 500; color: var(--text-secondary); margin-bottom: 4px; }
-.pkg-bonus { font-size: 12px; color: #059669; margin-bottom: 20px; }
+.pkg-amount {
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.pkg-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.pkg-price {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.pkg-bonus {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  min-height: 18px;
+}
+
+.pkg-bonus.has-bonus {
+  color: #059669;
+  font-weight: 500;
+}
 
 .pkg-btn {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  margin-top: auto;
 }
 
 .pkg-btn.primary {
