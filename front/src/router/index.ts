@@ -39,6 +39,11 @@ const router = createRouter({
       component: () => import('../views/TeamView.vue'),
     },
     {
+      path: '/ad-platforms',
+      name: 'ad-platforms',
+      component: () => import('../views/AdPlatformView.vue'),
+    },
+    {
       path: '/workflows/:id/permissions',
       name: 'workflow-permissions',
       component: () => import('../views/WorkflowPermissionsView.vue'),
