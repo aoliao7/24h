@@ -9,6 +9,7 @@ const store = useCreativeStore();
 const navItems = [
   { name: "首页", path: "/" },
   { name: "创意画布", path: "/canvas" },
+  { name: "广告投放", path: "/ad-platforms" },
   { name: "创作模板", path: "/templates" },
   { name: "作品画廊", path: "/gallery" },
   { name: "积分管理", path: "/credits" },
