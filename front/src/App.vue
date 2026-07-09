@@ -64,24 +64,16 @@ const navigateTo = (path: string) => {
       </nav>
 
       <div class="nav-actions">
-        <div class="credits-display">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <circle
-              cx="8"
-              cy="8"
-              r="6"
-              stroke="currentColor"
-              stroke-width="1.5"
-            />
-            <path
-              d="M8 5v3l2 1"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-          </svg>
+        <div class="credits-display" :class="{ 'low-balance': store.credits < 100 }">
+          <div class="credits-icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 5v3l2 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
           <span class="credits-value">{{ store.credits }}</span>
           <span class="credits-label">积分</span>
+          <button class="recharge-link" @click.stop="router.push('/credits')">充值</button>
         </div>
         <div class="user-avatar">
           <span>H</span>
@@ -182,21 +174,67 @@ const navigateTo = (path: string) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 6px 12px 6px 8px;
   background: var(--bg-elevated);
   border-radius: 24px;
   color: var(--text-secondary);
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.credits-display:hover {
+  border-color: var(--accent-cyan);
+  background: rgba(78, 205, 196, 0.05);
+}
+
+.credits-display.low-balance {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.credits-display.low-balance .credits-value {
+  color: #dc2626;
+}
+
+.credits-icon {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
 }
 
 .credits-value {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text-primary);
+  min-width: 40px;
 }
 
 .credits-label {
   font-size: 12px;
   color: var(--text-muted);
+  margin-right: 4px;
+}
+
+.recharge-link {
+  background: none;
+  border: none;
+  color: var(--accent-cyan);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 10px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.recharge-link:hover {
+  background: rgba(78, 205, 196, 0.1);
 }
 
 .user-avatar {

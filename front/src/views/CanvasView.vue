@@ -4,8 +4,11 @@ import { VueFlow, useVueFlow, MarkerType } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import WorkflowNode from './components/WorkflowNode.vue'
+import { useCreativeStore, calculateWorkflowCost } from '@/stores/creative'
+
+const store = useCreativeStore()
 
 // ============================================================
 // 数据类型系统
@@ -385,6 +388,9 @@ const runStatus = ref<RunStatus>('idle')
 const runProgress = ref(0)
 const runningNodeId = ref<string | null>(null)
 
+// 计算工作流所需积分
+const workflowCost = computed(() => calculateWorkflowCost(nodes.value))
+
 const getNodeOutputType = (nodeDefId: string): DataType => {
   const def = nodeDefinitions.find(d => d.id === nodeDefId)
   if (!def || def.outputs.length === 0) return 'none'
@@ -401,6 +407,47 @@ const runWorkflow = async () => {
     ElMessage.warning('请先添加输入节点')
     return
   }
+
+  // 检查积分
+  const cost = workflowCost.value
+  if (cost > 0) {
+    if (store.credits < cost) {
+      ElMessageBox.confirm(
+        `当前工作流需要 ${cost} 积分，您的余额为 ${store.credits} 积分，余额不足。是否前往充值？`,
+        '积分不足',
+        {
+          confirmButtonText: '前往充值',
+          cancelButtonText: '取消',
+          type: 'warning',
+        }
+      ).then(() => {
+        window.location.href = '/credits'
+      }).catch(() => {})
+      return
+    }
+
+    // 确认扣费
+    try {
+      await ElMessageBox.confirm(
+        `<div style="text-align:center">
+          <div style="font-size:14px;color:#666;margin-bottom:8px">预估消耗</div>
+          <div style="font-size:32px;font-weight:700;color:#4ecdc4">${cost}</div>
+          <div style="font-size:12px;color:#999;margin-bottom:16px">积分</div>
+          <div style="font-size:13px;color:#333">当前余额：${store.credits} 积分</div>
+          <div style="font-size:13px;color:#333">生成后余额：${store.credits - cost} 积分</div>
+        </div>`,
+        '确认开始生成？',
+        {
+          confirmButtonText: '确认开始',
+          cancelButtonText: '取消',
+          dangerouslyUseHTMLString: true,
+        }
+      )
+    } catch {
+      return
+    }
+  }
+
   runStatus.value = 'running'
   runProgress.value = 0
   ElMessage.info('开始执行工作流...')
@@ -471,8 +518,15 @@ const runWorkflow = async () => {
   }
   runningNodeId.value = null
   runStatus.value = 'done'
+
+  // 扣除积分
+  if (cost > 0) {
+    store.deductCredits(cost, '工作流生成')
+    ElMessage.success(`工作流执行完成！已消耗 ${cost} 积分，剩余 ${store.credits} 积分`)
+  } else {
+    ElMessage.success('工作流执行完成！')
+  }
   saveDraft()
-  ElMessage.success('工作流执行完成！')
 }
 
 // 查找上游数据
@@ -856,13 +910,17 @@ const downloadVideo = (node: VueFlowNode) => {
           </div>
           <span class="progress-text">执行中 {{ runProgress }}%</span>
         </div>
+        <div class="run-cost-info" v-if="workflowCost > 0 && runStatus !== 'running'">
+          <span class="cost-label">本次消耗</span>
+          <span class="cost-value">{{ workflowCost }} 积分</span>
+        </div>
         <div class="run-actions">
           <button class="btn-outline" @click="resetWorkflow" v-if="runStatus === 'done'">重置</button>
           <button
             class="btn-accent full-width"
-            :class="{ running: runStatus === 'running' }"
+            :class="{ running: runStatus === 'running', disabled: store.credits < workflowCost && workflowCost > 0 }"
             @click="runWorkflow"
-            :disabled="runStatus === 'running'"
+            :disabled="runStatus === 'running' || (store.credits < workflowCost && workflowCost > 0)"
           >
             <svg v-if="runStatus !== 'running'" width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M3 2L11 7L3 12V2Z" fill="currentColor"/>
@@ -871,6 +929,14 @@ const downloadVideo = (node: VueFlowNode) => {
             {{ runStatus === 'running' ? '执行中...' : runStatus === 'done' ? '重新执行' : '开始生成' }}
           </button>
         </div>
+        <div class="balance-hint" v-if="workflowCost > 0 && store.credits < workflowCost">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M6 4V7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            <circle cx="6" cy="8.5" r="0.5" fill="currentColor"/>
+          </svg>
+          积分不足，请先充值
+        </div>
       </div>
     </aside>
 
@@ -878,11 +944,18 @@ const downloadVideo = (node: VueFlowNode) => {
     <div class="canvas-container">
       <div class="canvas-toolbar">
         <div class="toolbar-left">
-          <span class="canvas-title">创意工作流</span>
+          <span class="canvas-title">{{ currentDraft.name }}</span>
           <span class="canvas-status" :class="runStatus">
             <span class="status-dot"></span>
             {{ runStatus === 'idle' ? '未保存' : runStatus === 'running' ? `执行中 ${runProgress}%` : '已完成' }}
           </span>
+          <div class="workflow-cost" v-if="workflowCost > 0 && nodes.length > 0">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M6 4V6.5L7.5 7.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+            <span>预估消耗 {{ workflowCost }} 积分</span>
+          </div>
         </div>
         <div class="toolbar-center">
           <div class="type-legend">
@@ -1503,6 +1576,23 @@ const downloadVideo = (node: VueFlowNode) => {
   gap: 12px;
 }
 
+.workflow-cost {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: rgba(78, 205, 196, 0.08);
+  border: 1px solid rgba(78, 205, 196, 0.2);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--accent-cyan);
+  font-weight: 500;
+}
+
+.workflow-cost svg {
+  opacity: 0.8;
+}
+
 .canvas-title {
   font-size: 14px;
   font-weight: 500;
@@ -1741,6 +1831,46 @@ const downloadVideo = (node: VueFlowNode) => {
   font-size: 11px;
   color: var(--text-muted);
   text-align: center;
+}
+
+.run-cost-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(78, 205, 196, 0.06);
+  border: 1px solid rgba(78, 205, 196, 0.15);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.cost-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cost-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+.balance-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #dc2626;
+  padding: 6px;
+  background: rgba(220, 38, 38, 0.06);
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+.btn-accent.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .run-actions {
