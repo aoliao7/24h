@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, markRaw, type Component, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { VueFlow, useVueFlow, MarkerType } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -7,8 +8,21 @@ import { MiniMap } from '@vue-flow/minimap'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import WorkflowNode from './components/WorkflowNode.vue'
 import { useCreativeStore, calculateWorkflowCost } from '@/stores/creative'
+import SharePanel from './components/SharePanel.vue'
 
 const store = useCreativeStore()
+
+const route = useRoute()
+const router = useRouter()
+
+// ============================================================
+// 导航
+// ============================================================
+const goToPermissions = () => {
+  const draft = currentDraft.value
+  const workflowId = draft?.id || route.params.id || 'default'
+  router.push(`/workflows/${workflowId}/permissions`)
+}
 
 // ============================================================
 // 数据类型系统
@@ -198,6 +212,15 @@ interface VueFlowEdge {
 // ============================================================
 // 草稿管理
 // ============================================================
+interface Collaborator {
+  userId: string
+  name: string
+  email: string
+  role: 'owner' | 'consumer' | 'viewer'
+  credits: number
+  invitedAt: string
+}
+
 interface Draft {
   id: string
   name: string
@@ -205,16 +228,95 @@ interface Draft {
   edges: VueFlowEdge[]
   createdAt: string
   updatedAt: string
+  ownerId: string
+  collaborators: Collaborator[]
+  shareToken?: string
+  isPublic: boolean
 }
+
+const generateShareToken = () => `wf_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`
+
+const currentUserId = () => 'user-' + Math.random().toString(36).slice(2, 8)
 
 const drafts = ref<Draft[]>([
   {
     id: 'default',
     name: '工作流 1',
-    nodes: [],
-    edges: [],
+    nodes: [
+      {
+        id: 'n1',
+        type: 'custom',
+        label: '产品图片',
+        nodeDefId: 'product-image',
+        position: { x: 100, y: 200 },
+        data: { status: 'idle', outputData: null, imageUrl: '' },
+      },
+      {
+        id: 'n2',
+        type: 'custom',
+        label: 'AI 图片生成',
+        nodeDefId: 'ai-image-gen',
+        position: { x: 360, y: 200 },
+        data: { status: 'idle', outputData: null, aiImageModel: '标准', aiImageSize: '1024×1024' },
+      },
+      {
+        id: 'n3',
+        type: 'custom',
+        label: '风格滤镜',
+        nodeDefId: 'style-filter',
+        position: { x: 620, y: 200 },
+        data: { status: 'idle', outputData: null, filterPreset: '自然' },
+      },
+      {
+        id: 'n4',
+        type: 'custom',
+        label: '导出图片',
+        nodeDefId: 'export-image',
+        position: { x: 880, y: 200 },
+        data: { status: 'idle', outputData: null },
+      },
+    ],
+    edges: [
+      {
+        id: 'e-n1-n2',
+        source: 'n1',
+        target: 'n2',
+        sourceHandle: 'out-image',
+        targetHandle: 'in-image',
+        animated: true,
+        style: { stroke: '#4ecdc4', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#4ecdc4' },
+        data: { dataType: 'image' },
+      },
+      {
+        id: 'e-n2-n3',
+        source: 'n2',
+        target: 'n3',
+        sourceHandle: 'out-image',
+        targetHandle: 'in-image',
+        animated: true,
+        style: { stroke: '#a78bfa', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
+        data: { dataType: 'image' },
+      },
+      {
+        id: 'e-n3-n4',
+        source: 'n3',
+        target: 'n4',
+        sourceHandle: 'out-image',
+        targetHandle: 'in-image',
+        animated: true,
+        style: { stroke: '#34d399', strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#34d399' },
+        data: { dataType: 'image' },
+      },
+    ],
     createdAt: new Date().toLocaleDateString('zh-CN'),
     updatedAt: new Date().toLocaleDateString('zh-CN'),
+    ownerId: currentUserId(),
+    collaborators: [],
+    shareToken: '',
+    isPublic: false,
   },
 ])
 
@@ -224,8 +326,141 @@ const currentDraft = computed(() =>
   drafts.value.find(d => d.id === currentDraftId.value) || drafts.value[0]
 )
 
+const currentUserRole = computed(() => {
+  const draft = currentDraft.value
+  if (!draft) return 'viewer'
+  if (draft.ownerId === currentUserId()) return 'owner'
+  const collab = draft.collaborators.find(c => c.userId === currentUserId())
+  return collab?.role || 'viewer'
+})
+
+const hasPermission = (permission: 'view' | 'edit' | 'run' | 'share' | 'download' | 'consume') => {
+  const role = currentUserRole.value
+  if (role === 'owner') return true
+  if (role === 'consumer') return ['view', 'edit', 'run', 'consume', 'download'].includes(permission)
+  return permission === 'view' || permission === 'download'
+}
+
+const shareTokenRoute = computed(() => {
+  const token = currentDraft.value.shareToken
+  return token ? `/canvas/share/${token}` : ''
+})
+
+const generateShareLink = () => {
+  const draft = currentDraft.value
+  if (!draft) return
+  draft.shareToken = generateShareToken()
+  ElMessage.success('共享链接已生成')
+}
+
+const togglePublic = () => {
+  const draft = currentDraft.value
+  if (!draft) return
+  draft.isPublic = !draft.isPublic
+  ElMessage.success(draft.isPublic ? '已开启公开访问' : '已关闭公开访问')
+}
+
+const inviteCollaborator = (email: string, role: 'consumer' | 'viewer') => {
+  const draft = currentDraft.value
+  if (!draft) return
+  if (draft.collaborators.some(c => c.email === email)) {
+    ElMessage.warning('该成员已在协作者列表中')
+    return
+  }
+  draft.collaborators.push({
+    userId: 'user-' + Math.random().toString(36).slice(2, 8),
+    name: email.split('@')[0],
+    email,
+    role,
+    invitedAt: new Date().toLocaleDateString('zh-CN'),
+  })
+  ElMessage.success('邀请成功')
+}
+
+const removeCollaborator = (userId: string) => {
+  const draft = currentDraft.value
+  if (!draft) return
+  draft.collaborators = draft.collaborators.filter(c => c.userId !== userId)
+  ElMessage.success('已移除')
+}
+
+const roleLabels: Record<string, string> = {
+  owner: '拥有者',
+  consumer: '可消耗点数',
+  viewer: '仅查看素材',
+}
+
+const showCollabPanel = ref(false)
+
+const members = computed(() => {
+  const draft = currentDraft.value
+  if (!draft) return []
+  return [
+    {
+      userId: draft.ownerId,
+      name: '我',
+      email: 'owner@example.com',
+      role: 'owner',
+      invitedAt: draft.createdAt,
+    },
+    ...draft.collaborators,
+  ]
+})
+
+const canEditRole = (member: { userId: string; role: string }) => {
+  const role = currentUserRole.value
+  if (role !== 'owner') return false
+  if (member.role === 'owner') return false
+  return true
+}
+
+const canRemoveMember = (member: { userId: string; role: string }) => {
+  const role = currentUserRole.value
+  if (role !== 'owner') return false
+  if (member.role === 'owner') return false
+  return true
+}
+
+const updateMemberRole = (userId: string, role: 'consumer' | 'viewer') => {
+  const draft = currentDraft.value
+  if (!draft) return
+  const member = draft.collaborators.find(c => c.userId === userId)
+  if (!member) return
+  member.role = role
+  if (role === 'viewer') {
+    member.credits = 0
+  }
+  ElMessage.success('权限已更新')
+}
+
+const removeMember = (userId: string) => {
+  removeCollaborator(userId)
+}
+
+const inviteEmail = ref('')
+const inviteRole = ref<'consumer' | 'viewer'>('consumer')
+
+const inviteMember = () => {
+  const email = inviteEmail.value.trim()
+  if (!email) {
+    ElMessage.warning('请输入邮箱')
+    return
+  }
+  inviteCollaborator(email, inviteRole.value)
+  inviteEmail.value = ''
+}
+
+const canRunWorkflow = computed(() => {
+  const role = currentUserRole.value
+  if (role === 'viewer') return false
+  return true
+})
+
 const nodes = ref<VueFlowNode[]>([...currentDraft.value.nodes])
 const edges = ref<VueFlowEdge[]>([...currentDraft.value.edges])
+
+console.log('初始化节点数量:', nodes.value.length, '边数量:', edges.value.length)
+console.log('当前草稿:', currentDraft.value.name, '节点:', currentDraft.value.nodes.map(n => n.id))
 
 const switchDraft = (draftId: string) => {
   const draft = drafts.value.find(d => d.id === draftId)
@@ -254,6 +489,10 @@ const createDraft = () => {
     edges: [],
     createdAt: new Date().toLocaleDateString('zh-CN'),
     updatedAt: new Date().toLocaleDateString('zh-CN'),
+    ownerId: currentUserId(),
+    collaborators: [],
+    shareToken: '',
+    isPublic: false,
   }
   drafts.value.push(draft)
   currentDraftId.value = id
@@ -388,6 +627,8 @@ const runStatus = ref<RunStatus>('idle')
 const runProgress = ref(0)
 const runningNodeId = ref<string | null>(null)
 
+const showSharePanel = ref(false)
+
 // 计算工作流所需积分
 const workflowCost = computed(() => calculateWorkflowCost(nodes.value))
 
@@ -399,6 +640,10 @@ const getNodeOutputType = (nodeDefId: string): DataType => {
 
 const runWorkflow = async () => {
   if (runStatus.value === 'running') return
+  if (!hasPermission('run')) {
+    ElMessage.error('当前角色无运行工作流权限')
+    return
+  }
   const startNodes = nodes.value.filter(n => {
     const def = nodeDefinitions.find(d => d.id === n.nodeDefId)
     return def?.category === 'input'
@@ -992,6 +1237,7 @@ const downloadVideo = (node: VueFlowNode) => {
           @connect-start="onConnectStart"
           fit-view-on-init
           :default-edge-options="{ animated: true, style: { strokeWidth: 2 } }"
+          style="height: 100%; width: 100%"
         >
           <Background pattern-color="rgba(78, 205, 196, 0.04)" :gap="24" />
           <Controls />
@@ -1051,6 +1297,82 @@ const downloadVideo = (node: VueFlowNode) => {
         </Transition>
       </div>
 
+      <!-- 多人协作面板 -->
+      <transition name="slide">
+        <aside v-if="showCollabPanel" class="properties-panel card">
+          <div class="panel-header">
+            <h3>协作管理</h3>
+            <button class="close-btn" @click="showCollabPanel = false">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M4 4L12 12M4 12L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="panel-content">
+            <div class="property-section">
+              <div class="member-header">
+                <div>
+                  <div class="property-label">成员与权限</div>
+                  <div class="property-desc">可消耗点数：可运行并扣减素材积分；仅查看素材：仅浏览，不可运行</div>
+                </div>
+                <div class="role-badge" :class="currentUserRole">{{ roleLabels[currentUserRole] }}</div>
+              </div>
+
+              <div class="member-list">
+                <div v-for="member in members" :key="member.userId" class="member-item">
+                  <div class="member-info">
+                    <div class="member-avatar">{{ member.name[0] }}</div>
+                    <div class="member-meta">
+                      <span class="member-name">{{ member.name }}</span>
+                      <span class="member-email">{{ member.email }}</span>
+                    </div>
+                  </div>
+                  <div class="member-actions">
+                    <span class="role-tag" :class="member.role">{{ roleLabels[member.role] }}</span>
+                    <el-select
+                      v-if="canEditRole(member)"
+                      :model-value="member.role"
+                      @update:model-value="updateMemberRole(member.userId, $event)"
+                      size="small"
+                      style="width: 160px"
+                    >
+                      <el-option label="可消耗点数" value="consumer" />
+                      <el-option label="仅查看素材" value="viewer" />
+                    </el-select>
+                    <button
+                      v-if="canRemoveMember(member)"
+                      class="member-remove"
+                      @click="removeMember(member.userId)"
+                    >移除</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="property-section">
+              <div class="invite-row">
+                <input v-model="inviteEmail" class="invite-input" placeholder="输入邮箱邀请成员" />
+                <el-select v-model="inviteRole" size="small" style="width: 160px">
+                  <el-option label="可消耗点数" value="consumer" />
+                  <el-option label="仅查看素材" value="viewer" />
+                </el-select>
+                <button class="btn-accent invite-btn" @click="inviteMember">邀请</button>
+              </div>
+              <div class="permission-hint">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/>
+                  <path d="M7 6.5v3.5M7 5v.75" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                </svg>
+                <span>owner 拥有全部权限，consumer 可消耗点数，viewer 仅查看素材</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </transition>
+
       <!-- 底部草稿管理条 -->
       <div class="draft-bar">
         <div class="draft-bar__left">
@@ -1090,6 +1412,20 @@ const downloadVideo = (node: VueFlowNode) => {
               <path d="M4 12V8H10V12" stroke="currentColor" stroke-width="1.2"/>
             </svg>
             保存
+          </button>
+          <button class="draft-action-btn" @click="showSharePanel = true" title="共享">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M5 7C5 5.89543 5.89543 5 7 5C8.10457 5 9 5.89543 9 7C9 8.10457 8.10457 9 7 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M11.5 7C11.5 4.79086 9.70914 3 7.5 3C5.29086 3 3.5 4.79086 3.5 7C3.5 9.20914 5.29086 11 7.5 11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M3 11C2.44772 11 2 11.4477 2 12C2 12.5523 2.44772 13 3 13H11C11.5523 13 12 12.5523 12 12C12 11.4477 11.5523 11 11 11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button class="draft-action-btn" @click="goToPermissions" title="权限管理">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M12 7C12 9.20914 10.2091 11 8 11C5.79086 11 4 9.20914 4 7C4 4.79086 5.79086 3 8 3C10.2091 3 12 4.79086 12 7Z" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M8 7V10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              <path d="M8 5.5V5.51" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -1804,6 +2140,187 @@ const downloadVideo = (node: VueFlowNode) => {
 
 .draft-action-btn.primary:hover {
   background: rgba(78, 205, 196, 0.15);
+}
+
+/* ===== 协作面板 ===== */
+.member-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.property-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.role-badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(78, 205, 196, 0.1);
+  color: #0d9488;
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  white-space: nowrap;
+}
+
+.role-badge.viewer {
+  background: rgba(107, 114, 128, 0.08);
+  color: #4b5563;
+  border-color: rgba(107, 114, 128, 0.25);
+}
+
+.member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.member-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.member-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.member-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #4ecdc4, #a78bfa);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.member-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.member-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.member-email {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.role-tag {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(78, 205, 196, 0.1);
+  color: #0d9488;
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  white-space: nowrap;
+}
+
+.role-tag.viewer {
+  background: rgba(107, 114, 128, 0.08);
+  color: #4b5563;
+  border-color: rgba(107, 114, 128, 0.25);
+}
+
+.member-remove {
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #dc2626;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.member-remove:hover {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.invite-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.invite-input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+}
+
+.invite-input:focus {
+  border-color: #4ecdc4;
+  box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.12);
+}
+
+.invite-btn {
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #4ecdc4, #a78bfa);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.invite-btn:hover {
+  transform: translateY(1px);
+  box-shadow: 0 8px 18px rgba(78, 205, 196, 0.25);
+}
+
+.permission-hint {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(78, 205, 196, 0.06);
+  border: 1px solid rgba(78, 205, 196, 0.15);
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 /* ===== 进度条 ===== */
