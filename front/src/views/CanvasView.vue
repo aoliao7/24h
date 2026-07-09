@@ -7,7 +7,7 @@ import { Controls } from "@vue-flow/controls";
 import { MiniMap } from "@vue-flow/minimap";
 import { ElMessage, ElMessageBox } from "element-plus";
 import WorkflowNode from "./components/WorkflowNode.vue";
-import { useCreativeStore, calculateWorkflowCost } from "@/stores/creative";
+import { useCreativeStore, calculateWorkflowCost } from "../stores/creative";
 import SharePanel from "./components/SharePanel.vue";
 import * as echarts from "echarts";
 
@@ -262,7 +262,8 @@ interface Draft {
 const generateShareToken = () =>
   `wf_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
 
-const currentUserId = () => "user-" + Math.random().toString(36).slice(2, 8);
+// 当前用户固定为 owner 角色（最大权限）
+const currentUserId = "user-owner-admin";
 
 const drafts = ref<Draft[]>([
   {
@@ -344,7 +345,7 @@ const drafts = ref<Draft[]>([
     ],
     createdAt: new Date().toLocaleDateString("zh-CN"),
     updatedAt: new Date().toLocaleDateString("zh-CN"),
-    ownerId: currentUserId(),
+    ownerId: currentUserId,
     collaborators: [],
     shareToken: "",
     isPublic: false,
@@ -361,8 +362,8 @@ const currentDraft = computed(
 const currentUserRole = computed(() => {
   const draft = currentDraft.value;
   if (!draft) return "viewer";
-  if (draft.ownerId === currentUserId()) return "owner";
-  const collab = draft.collaborators.find((c) => c.userId === currentUserId());
+  if (draft.ownerId === currentUserId) return "owner";
+  const collab = draft.collaborators.find((c) => c.userId === currentUserId);
   return collab?.role || "viewer";
 });
 
@@ -534,7 +535,7 @@ const createDraft = () => {
     edges: [],
     createdAt: new Date().toLocaleDateString("zh-CN"),
     updatedAt: new Date().toLocaleDateString("zh-CN"),
-    ownerId: currentUserId(),
+    ownerId: currentUserId,
     collaborators: [],
     shareToken: "",
     isPublic: false,
@@ -854,10 +855,13 @@ const findUpstreamData = (
   if (!edge) return null;
   const sourceNode = nodes.value.find((n) => n.id === edge.source);
   if (!sourceNode) return null;
-  if (sourceNode.data.imageUrl) return sourceNode.data.imageUrl;
-  if (sourceNode.data.generatedImageUrl)
-    return sourceNode.data.generatedImageUrl;
-  return findUpstreamData(edge.source, dataType);
+  // 只有节点已完成时才返回图片
+  if (sourceNode.data.status === "done") {
+    if (sourceNode.data.generatedImageUrl) return sourceNode.data.generatedImageUrl;
+    if (sourceNode.data.imageUrl) return sourceNode.data.imageUrl;
+    if (sourceNode.data.generatedVideoUrl) return sourceNode.data.generatedVideoUrl;
+  }
+  return null;
 };
 
 const resetWorkflow = () => {

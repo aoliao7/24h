@@ -1,23 +1,22 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useCreativeStore } from "../stores/creative";
+import { computed } from 'vue'
+import { useCreativeStore } from '@/stores/creative'
 
-const store = useCreativeStore();
+const store = useCreativeStore()
 
-const formatAmount = (amount: number) =>
-  amount > 0 ? `+${amount}` : amount.toString();
+const formatAmount = (amount: number) => amount > 0 ? `+${amount}` : amount.toString()
 
 const packages = [
   { amount: 100, price: 10, bonus: null, recommended: false },
   { amount: 500, price: 45, bonus: 30, recommended: false },
   { amount: 1000, price: 80, bonus: 100, recommended: true },
   { amount: 2000, price: 150, bonus: 300, recommended: false },
-];
+]
 
-const handleRecharge = (pkg: (typeof packages)[0]) => {
-  const actualAmount = pkg.amount + (pkg.bonus || 0);
-  store.addCredits(actualAmount);
-};
+const handleRecharge = (pkg: typeof packages[0]) => {
+  const actualAmount = pkg.amount + (pkg.bonus || 0)
+  store.addCredits(actualAmount)
+}
 </script>
 
 <template>
@@ -33,19 +32,8 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
           <span class="balance-label">当前余额</span>
           <div class="balance-icon">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <circle
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="2"
-              />
-              <path
-                d="M12 6V12L16 14"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-              />
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+              <path d="M12 6V12L16 14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </div>
         </div>
@@ -57,12 +45,7 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
       <div class="stat-card card">
         <div class="stat-icon usage">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M3 17L10 3L17 17H3Z"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linejoin="round"
-            />
+            <path d="M3 17L10 3L17 17H3Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
           </svg>
         </div>
         <div class="stat-content">
@@ -75,12 +58,7 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
       <div class="stat-card card">
         <div class="stat-icon free">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path
-              d="M10 2L12.5 7.5H18L13.5 11L15.5 17L10 13.5L4.5 17L6.5 11L2 7.5H7.5L10 2Z"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linejoin="round"
-            />
+            <path d="M10 2L12.5 7.5H18L13.5 11L15.5 17L10 13.5L4.5 17L6.5 11L2 7.5H7.5L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
           </svg>
         </div>
         <div class="stat-content">
@@ -97,24 +75,9 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
         <h2>消耗明细</h2>
         <button class="export-btn">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M14 10V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V10"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-            <path
-              d="M4 6V2H12V6"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
-            <path
-              d="M8 9V4M8 4L5 7M8 4L11 7"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linecap="round"
-            />
+            <path d="M14 10V12C14 12.5523 13.5523 13 13 13H3C2.44772 13 2 12.5523 2 12V10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M4 6V2H12V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M8 9V4M8 4L5 7M8 4L11 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
           导出记录
         </button>
@@ -125,10 +88,7 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
         <el-table-column prop="desc" label="描述" />
         <el-table-column label="积分" width="120" align="center">
           <template #default="{ row }">
-            <span
-              class="amount-value"
-              :class="{ positive: row.amount > 0, negative: row.amount < 0 }"
-            >
+            <span class="amount-value" :class="{ positive: row.amount > 0, negative: row.amount < 0 }">
               {{ formatAmount(row.amount) }}
             </span>
           </template>
@@ -140,24 +100,15 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
     <div class="section">
       <h2>充值套餐</h2>
       <div class="packages-grid">
-        <div
-          v-for="pkg in packages"
-          :key="pkg.amount"
-          class="package-card card"
-          :class="{ recommended: pkg.recommended }"
-        >
+        <div v-for="pkg in packages" :key="pkg.amount" class="package-card card" :class="{ recommended: pkg.recommended }">
           <div v-if="pkg.recommended" class="recommended-badge">推荐</div>
           <div class="pkg-amount">{{ pkg.amount }}</div>
           <div class="pkg-label">积分</div>
           <div class="pkg-price">¥{{ pkg.price }}</div>
           <div class="pkg-bonus" :class="{ 'has-bonus': pkg.bonus }">
-            {{ pkg.bonus ? `+${pkg.bonus} 赠送` : "无优惠" }}
+            {{ pkg.bonus ? `+${pkg.bonus} 赠送` : '无优惠' }}
           </div>
-          <button
-            class="pkg-btn"
-            :class="{ primary: pkg.recommended }"
-            @click="handleRecharge(pkg)"
-          >
+          <button class="pkg-btn" :class="{ primary: pkg.recommended }" @click="handleRecharge(pkg)">
             立即充值
           </button>
         </div>
@@ -173,14 +124,8 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
   margin: 0 auto;
 }
 
-.page-header {
-  margin-bottom: 24px;
-}
-.page-header h1 {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
+.page-header { margin-bottom: 24px; }
+.page-header h1 { font-size: 24px; font-weight: 600; color: var(--text-primary); }
 
 .stats-row {
   display: grid;
@@ -201,10 +146,7 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
   margin-bottom: 20px;
 }
 
-.balance-label {
-  font-size: 13px;
-  color: var(--text-muted);
-}
+.balance-label { font-size: 13px; color: var(--text-muted); }
 
 .balance-icon {
   width: 44px;
@@ -228,11 +170,7 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
   background-clip: text;
 }
 
-.balance-unit {
-  font-size: 14px;
-  color: var(--text-muted);
-  margin-bottom: 24px;
-}
+.balance-unit { font-size: 14px; color: var(--text-muted); margin-bottom: 24px; }
 
 .recharge-btn {
   width: 100%;
@@ -255,33 +193,14 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
   justify-content: center;
 }
 
-.stat-icon.usage {
-  background: rgba(251, 191, 36, 0.08);
-  color: #d97706;
-}
-.stat-icon.free {
-  background: rgba(52, 211, 153, 0.08);
-  color: #059669;
-}
+.stat-icon.usage { background: rgba(251, 191, 36, 0.08); color: #d97706; }
+.stat-icon.free { background: rgba(52, 211, 153, 0.08); color: #059669; }
 
-.stat-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.stat-label {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.stat-value {
-  font-size: 28px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
+.stat-content { display: flex; flex-direction: column; gap: 4px; }
+.stat-label { font-size: 12px; color: var(--text-muted); }
+.stat-value { font-size: 28px; font-weight: 600; color: var(--text-primary); }
 
-.section {
-  margin-bottom: 32px;
-}
+.section { margin-bottom: 32px; }
 
 .section-header {
   display: flex;
@@ -290,11 +209,7 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
   margin-bottom: 20px;
 }
 
-.section-header h2 {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
+.section-header h2 { font-size: 16px; font-weight: 600; color: var(--text-primary); }
 
 .export-btn {
   display: flex;
@@ -310,21 +225,11 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
   transition: all 0.2s;
 }
 
-.export-btn:hover {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-}
+.export-btn:hover { border-color: var(--accent-cyan); color: var(--accent-cyan); }
 
-.amount-value {
-  font-weight: 600;
-  font-size: 14px;
-}
-.amount-value.positive {
-  color: #059669;
-}
-.amount-value.negative {
-  color: #dc2626;
-}
+.amount-value { font-weight: 600; font-size: 14px; }
+.amount-value.positive { color: #059669; }
+.amount-value.negative { color: #dc2626; }
 
 .packages-grid {
   display: grid;
@@ -415,33 +320,17 @@ const handleRecharge = (pkg: (typeof packages)[0]) => {
   color: #fff;
 }
 
-.pkg-btn:hover {
-  transform: translateY(-2px);
-}
-.pkg-btn.primary:hover {
-  box-shadow: 0 4px 16px rgba(78, 205, 196, 0.3);
-}
+.pkg-btn:hover { transform: translateY(-2px); }
+.pkg-btn.primary:hover { box-shadow: 0 4px 16px rgba(78, 205, 196, 0.3); }
 
 @media (max-width: 1200px) {
-  .stats-row {
-    grid-template-columns: 1fr 1fr;
-  }
-  .balance-card {
-    grid-column: span 2;
-  }
-  .packages-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .balance-card { grid-column: span 2; }
+  .packages-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
-  .stats-row {
-    grid-template-columns: 1fr;
-  }
-  .balance-card {
-    grid-column: span 1;
-  }
-  .packages-grid {
-    grid-template-columns: 1fr;
-  }
+  .stats-row { grid-template-columns: 1fr; }
+  .balance-card { grid-column: span 1; }
+  .packages-grid { grid-template-columns: 1fr; }
 }
 </style>

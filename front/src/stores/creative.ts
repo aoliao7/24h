@@ -41,14 +41,14 @@ export const useCreativeStore = defineStore('creative', () => {
   ])
 
   const creatives = ref<Creative[]>([
-    { id: '1', title: '夏日清凉饮料海报', type: 'image', status: 'completed', createdAt: '2024-01-15' },
-    { id: '2', title: '产品展示视频', type: 'video', status: 'completed', createdAt: '2024-01-14' },
-    { id: '3', title: '品牌宣传图', type: 'image', status: 'completed', createdAt: '2024-01-13' },
-    { id: '4', title: '节日促销banner', type: 'image', status: 'completed', createdAt: '2024-01-12' },
-    { id: '5', title: '新品发布会视频', type: 'video', status: 'generating', createdAt: '2024-01-11' },
-    { id: '6', title: '社交媒体配图', type: 'image', status: 'completed', createdAt: '2024-01-10' },
-    { id: '7', title: '电商主图设计', type: 'image', status: 'draft', createdAt: '2024-01-09' },
-    { id: '8', title: '用户案例视频', type: 'video', status: 'completed', createdAt: '2024-01-08' },
+    { id: '1', title: '夏日清凉饮料海报', type: 'image', status: 'completed', createdAt: '2026-07-08', thumbnail: 'https://placehold.co/400x300/4ecdc4/ffffff?text=饮料海报' },
+    { id: '2', title: '产品展示视频', type: 'video', status: 'completed', createdAt: '2026-07-07', thumbnail: 'https://placehold.co/400x300/a78bfa/ffffff?text=产品视频' },
+    { id: '3', title: '品牌宣传图', type: 'image', status: 'completed', createdAt: '2026-07-06', thumbnail: 'https://placehold.co/400x300/60a5fa/ffffff?text=品牌宣传' },
+    { id: '4', title: '节日促销banner', type: 'image', status: 'completed', createdAt: '2026-07-05', thumbnail: 'https://placehold.co/400x300/f472b6/ffffff?text=节日促销' },
+    { id: '5', title: '新品发布会视频', type: 'video', status: 'generating', createdAt: '2026-07-04', thumbnail: 'https://placehold.co/400x300/34d399/ffffff?text=新品发布' },
+    { id: '6', title: '社交媒体配图', type: 'image', status: 'completed', createdAt: '2026-07-03', thumbnail: 'https://placehold.co/400x300/fbbf24/ffffff?text=社交配图' },
+    { id: '7', title: '电商主图设计', type: 'image', status: 'draft', createdAt: '2026-07-02', thumbnail: 'https://placehold.co/400x300/f87171/ffffff?text=电商主图' },
+    { id: '8', title: '用户案例视频', type: 'video', status: 'completed', createdAt: '2026-07-01', thumbnail: 'https://placehold.co/400x300/818cf8/ffffff?text=用户案例' },
   ])
 
   const deductCredits = (amount: number, desc: string) => {
