@@ -8,12 +8,12 @@ const store = useCreativeStore()
 
 const recentWorks = computed(() => store.creatives.slice(0, 6))
 
-const stats = [
-  { label: '总作品数', value: '128', trend: '+12%', up: true },
-  { label: '本月生成', value: '45', trend: '+28%', up: true },
-  { label: '消耗积分', value: '2,340', trend: '-8%', up: false },
+const stats = computed(() => [
+  { label: '总作品数', value: store.creatives.length.toString(), trend: '+2', up: true },
+  { label: '本月生成', value: store.creatives.filter(c => c.status === 'completed').length.toString(), trend: '+1', up: true },
+  { label: '消耗积分', value: store.transactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0).toLocaleString(), trend: '-5%', up: false },
   { label: '团队成员', value: '4', trend: null, up: null },
-]
+])
 
 const quickActions = [
   { title: '创意画布', desc: '自由组合AI节点', path: '/canvas', gradient: 'linear-gradient(135deg, #4ecdc4, #44a8a0)' },
@@ -91,16 +91,28 @@ const getStatusType = (status: string) => {
       <div class="works-grid">
         <div v-for="work in recentWorks" :key="work.id" class="work-card card card-hover">
           <div class="work-preview">
-            <div class="preview-placeholder">
+            <img v-if="work.thumbnail" :src="work.thumbnail" :alt="work.title" class="work-thumbnail" />
+            <div v-else class="preview-placeholder">
               <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
                 <rect x="6" y="6" width="28" height="28" rx="6" stroke="currentColor" stroke-width="1.5"/>
                 <circle cx="15" cy="15" r="4" stroke="currentColor" stroke-width="1.5"/>
                 <path d="M34 26L26 18L16 28" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               </svg>
             </div>
+            <!-- 类型标识 -->
+            <div class="type-badge" :class="work.type">
+              <svg v-if="work.type === 'video'" width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <path d="M2 2h5v8H2V2zM7 4l3-2v8l-3-2V4z"/>
+              </svg>
+              <svg v-else width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                <rect x="1" y="1" width="10" height="10" rx="1.5"/>
+                <circle cx="4" cy="4" r="1.5"/>
+                <path d="M1 8l3-3 2 2 3-4 2 3"/>
+              </svg>
+            </div>
             <div class="work-overlay">
               <button class="overlay-btn preview">预览</button>
-              <button class="overlay-btn edit">编辑</button>
+              <button class="overlay-btn edit" @click="router.push('/canvas')">编辑</button>
             </div>
           </div>
           <div class="work-info">
@@ -278,6 +290,40 @@ const getStatusType = (status: string) => {
   justify-content: center;
   color: var(--text-muted);
   position: relative;
+  overflow: hidden;
+}
+
+.work-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.work-card:hover .work-thumbnail {
+  transform: scale(1.05);
+}
+
+.type-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  z-index: 2;
+}
+
+.type-badge.video {
+  background: linear-gradient(135deg, #a78bfa, #8b5cf6);
+}
+
+.type-badge.image {
+  background: linear-gradient(135deg, #4ecdc4, #44a8a0);
 }
 
 .work-overlay {
