@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('../views/CanvasView.vue'),
     },
     {
+      path: '/canvas/share/:token',
+      name: 'canvas-share',
+      component: () => import('../views/CanvasView.vue'),
+    },
+    {
       path: '/templates',
       name: 'templates',
       component: () => import('../views/TemplatesView.vue'),
@@ -32,6 +37,11 @@ const router = createRouter({
       path: '/team',
       name: 'team',
       component: () => import('../views/TeamView.vue'),
+    },
+    {
+      path: '/workflows/:id/permissions',
+      name: 'workflow-permissions',
+      component: () => import('../views/WorkflowPermissionsView.vue'),
     },
   ],
 })
